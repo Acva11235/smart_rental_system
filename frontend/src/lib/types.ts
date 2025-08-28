@@ -214,3 +214,59 @@ export interface AdvancedForecastData {
   }>;
 }
 
+// Customer Portal Types
+export interface User {
+  id: string | number;
+  username: string;
+  userType: 'admin' | 'customer';
+  company_id?: number;
+}
+
+export interface AuthResponse {
+  message: string;
+  user: User;
+}
+
+export interface Company {
+  company_id: number;
+  name: string;
+}
+
+export interface CustomerDashboard {
+  companyInfo: {
+    name: string;
+    industry: string;
+    address: string;
+    state: string;
+    segment: string;
+  };
+  contractSummary: {
+    active: number;
+    completed: number;
+    overdue: number;
+  };
+  financials: {
+    totalBilledAmount: number;
+    paidInvoices: number;
+    pendingInvoices: number;
+  };
+  activeMachineCount: number;
+  activeMachines: Array<{
+    machine_id: number;
+    asset_type: string;
+    manufacturer: string;
+    end_date: string;
+  }>;
+}
+
+export interface Notification {
+  id: number;
+  client_id: number;
+  contract_id?: number;
+  notification_type: 'checkout_reminder' | 'payment_due' | 'contract_renewal' | 'maintenance_alert' | 'general';
+  message: string;
+  is_read: boolean;
+  sent_at: string;
+  read_at?: string;
+}
+

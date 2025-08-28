@@ -4,6 +4,7 @@ import { api } from '@/lib/api';
 import Loader from '@/components/Loader';
 import ErrorState from '@/components/ErrorState';
 import { KpiCard } from '@/components/KpiCard';
+import AuthGuard from '@/components/AuthGuard';
 import dynamic from 'next/dynamic';
 
 const FleetMap = dynamic(() => import('@/components/Map').then(mod => ({ default: mod.FleetMap })), {
@@ -20,7 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { Building2, DollarSign, MapPin, Calendar, Users, BarChart3 } from 'lucide-react';
 import { formatMoney } from '@/lib/format';
 
-export default function FleetDashboard() {
+function FleetDashboard() {
   const { data: assetsData, isLoading: assetsLoading, error: assetsError } = useQuery({
     queryKey: ['assets'],
     queryFn: api.getAssets,
@@ -229,5 +230,13 @@ export default function FleetDashboard() {
         />
       </div>
     </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <AuthGuard>
+      <FleetDashboard />
+    </AuthGuard>
   );
 }
