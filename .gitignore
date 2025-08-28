@@ -137,3 +137,27 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+# Additional safety ignores
+**/node_modules/
+**/.next/
+*.log
+.DS_Store
+.env
+.env.local
+.env.production
+.env.staging
+
+# IDE files  
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Build outputs
+dist/
+build/
