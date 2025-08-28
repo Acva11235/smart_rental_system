@@ -89,11 +89,11 @@ app.get('/api/assets', async (req, res) => {
 app.get('/api/health', async (req, res) => {
     try {
         // This query gets the most recent health analytic for each machine.
+        // CORRECTED: Removed m.manufacturer from the SELECT statement.
         const query = `
             SELECT DISTINCT ON (m.machine_id)
                 m.machine_id,
                 m.asset_type || ' #' || m.machine_id as name,
-                m.manufacturer,
                 mha.*
             FROM
                 Machine m
