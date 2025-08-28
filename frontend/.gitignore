@@ -39,3 +39,25 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# dependencies
+node_modules/
+
+# build outputs & caches
+dist/
+build/
+.next/
+out/
+coverage/
+.cache/
+.eslintcache
+.turbo/
+.parcel-cache/
+
+# env & logs
+.env
+.env.*
+*.log
+
+# OS/editor junk
+.DS_Store
+Thumbs.db
