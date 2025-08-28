@@ -46,15 +46,15 @@ app.get('/api/assets', async (req, res) => {
     try {
         const query = `
             SELECT
-    m.*,
-    CASE WHEN rc.rental_status = 'active' THEN 'Rented' ELSE m.status::text END AS "rentalStatus",
-    c.name AS "currentRenter"
-FROM
-    Machine m
-LEFT JOIN
-    RentalContract rc ON m.machine_id = rc.machine_id AND rc.rental_status = 'active'
-LEFT JOIN
-    Company c ON rc.company_id = c.company_id;
+                m.*,
+                CASE WHEN rc.rental_status = 'active' THEN 'Rented' ELSE m.status::text END AS "rentalStatus",
+                c.name AS "currentRenter"
+                FROM
+                Machine m
+            LEFT JOIN
+                RentalContract rc ON m.machine_id = rc.machine_id AND rc.rental_status = 'active'
+            LEFT JOIN
+                Company c ON rc.company_id = c.company_id;
         `;
         const { rows: assets } = await pool.query(query);
 
@@ -250,6 +250,108 @@ app.get('/api/customers', async (req, res) => {
     } catch (error) {
         console.error('Error fetching customer data:', error);
         res.status(500).json({ message: "Error processing customer data", error: error.message });
+    }
+});
+
+
+app.get('/api/reports/:companyId', async (req, res) => {
+    const { companyId } = req.params;
+    // Get start and end dates from query parameters, e.g., /api/reports/1?startDate=2025-01-01&endDate=2025-03-31
+    const { startDate, endDate } = req.query;
+
+    if (!startDate || !endDate) {
+        return res.status(400).json({ message: "Please provide both startDate and endDate query parameters." });
+    }
+
+    try {
+        const companyQuery = 'SELECT * FROM Company WHERE company_id = $1';
+        const { rows: companies } = await pool.query(companyQuery, [companyId]);
+        if (companies.length === 0) {
+            return res.status(404).json({ message: "Company not found" });
+        }
+
+        // CORRECTED QUERY
+        const reportQuery = `
+            WITH RelevantContracts AS (
+                SELECT contract_id, machine_id, actual_start_date, actual_end_date
+                FROM RentalContract
+                WHERE company_id = $1
+                  AND actual_start_date IS NOT NULL
+                  AND actual_end_date IS NOT NULL
+                  AND (actual_start_date, actual_end_date) OVERLAPS ($2::TIMESTAMPTZ, $3::TIMESTAMPTZ)
+            ),
+            AggregatedSensorData AS (
+                SELECT
+                    SUM(msd.avg_fuel_consumption_rate * (msd.productive_time_mins / 60.0)) AS total_fuel_consumed,
+                    AVG(msd.idle_fuel_consumption_pct) AS avg_idle_pct,
+                    SUM(msd.over_speed_events) AS total_over_speed_events,
+                    SUM(msd.overload_cycles) AS total_overload_cycles
+                FROM MachineSensorData msd
+                JOIN RelevantContracts rc ON msd.machine_id = rc.machine_id
+                WHERE msd."timestamp" >= rc.actual_start_date AND msd."timestamp" <= rc.actual_end_date
+            ),
+            AggregatedHealthData AS (
+                SELECT
+                    AVG(mha.fuel_efficiency_score) AS avg_fuel_efficiency_score,
+                    AVG(mha.safety_score) AS avg_safety_score,
+                    AVG(mha.wear_and_tear_index) AS avg_wear_and_tear_index,
+                    AVG(mha.downtime_risk_pct) AS avg_downtime_risk_pct
+                FROM MachineHealthAnalytics mha
+                JOIN RelevantContracts rc ON mha.machine_id = rc.machine_id
+                WHERE mha.log_timestamp >= rc.actual_start_date AND mha.log_timestamp <= rc.actual_end_date
+            ),
+            AggregatedContractData AS (
+                SELECT
+                    COUNT(CASE WHEN rc.actual_end_date > rc.end_date THEN 1 END) as overdue_contracts,
+                    COUNT(*) as total_contracts
+                FROM RentalContract rc
+                WHERE rc.company_id = $1
+                  AND rc.actual_end_date BETWEEN $2::TIMESTAMPTZ AND $3::TIMESTAMPTZ
+            )
+            SELECT * FROM AggregatedSensorData, AggregatedHealthData, AggregatedContractData;
+        `;
+
+        const { rows } = await pool.query(reportQuery, [companyId, startDate, endDate]);
+        const reportData = rows[0];
+
+        if (!reportData || reportData.total_contracts === null) {
+            return res.status(404).json({ message: "No contract data found for the specified period." });
+        }
+
+        // Constants for calculations
+        const CO2_EMISSION_FACTOR_PER_LITRE = 2.68; // kg CO2 per litre of diesel
+
+        const finalReport = {
+            company: companies[0],
+            reportingPeriod: {
+                from: startDate,
+                to: endDate
+            },
+            environmental: {
+                totalFuelConsumedLitres: parseFloat(reportData.total_fuel_consumed || 0).toFixed(2),
+                estimatedCo2EmissionsKg: (parseFloat(reportData.total_fuel_consumed || 0) * CO2_EMISSION_FACTOR_PER_LITRE).toFixed(2),
+                averageIdleTimePercentage: parseFloat(reportData.avg_idle_pct || 0).toFixed(2),
+                averageFuelEfficiencyScore: parseFloat(reportData.avg_fuel_efficiency_score || 0).toFixed(2)
+            },
+            social: {
+                averageSafetyScore: parseFloat(reportData.avg_safety_score || 0).toFixed(2),
+                totalOverSpeedEvents: parseInt(reportData.total_over_speed_events || 0),
+                totalOverloadCycles: parseInt(reportData.total_overload_cycles || 0)
+            },
+            governance: {
+                averageWearAndTearIndex: parseFloat(reportData.avg_wear_and_tear_index || 0).toFixed(2),
+                averageDowntimeRiskPercentage: parseFloat(reportData.avg_downtime_risk_pct || 0).toFixed(2),
+                onTimeReturnRate: reportData.total_contracts > 0 ?
+                    ((1 - (reportData.overdue_contracts / reportData.total_contracts)) * 100).toFixed(2) :
+                    "100.00"
+            }
+        };
+
+        res.json(finalReport);
+
+    } catch (error) {
+        console.error('Error generating ESG report:', error);
+        res.status(500).json({ message: "Error generating ESG report", error: error.message });
     }
 });
 
