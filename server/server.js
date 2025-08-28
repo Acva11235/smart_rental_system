@@ -2,6 +2,9 @@ const express = require('express');
 const cors = require('cors');
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
+// Anomaly detection integrations
+const { detectAnomaly } = require('./anamolyservice');
+const anomalyRoutes = require('./routes/anamoly');
 
 const app = express();
 const PORT = 5001;
@@ -13,6 +16,9 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// Mount anomaly routes
+app.use('/anomaly', anomalyRoutes);
 
 const pool = mysql.createPool({
   host: 'localhost',
@@ -759,6 +765,18 @@ app.get('/api/companies', async (req, res) => {
   } catch (error) {
     console.error('Companies fetch error:', error);
     res.status(500).json({ error: 'Failed to fetch companies' });
+  }
+});
+
+// Anomaly detection direct check endpoint
+app.post('/api/anomaly/check', async (req, res) => {
+  try {
+    const learn = req.query.learn === 'true';
+    const result = await detectAnomaly(req.body, learn);
+    res.json(result);
+  } catch (err) {
+    console.error('Anomaly detection error:', err.message);
+    res.status(500).json({ error: 'Failed to detect anomaly' });
   }
 });
 

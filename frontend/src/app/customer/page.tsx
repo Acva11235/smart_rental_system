@@ -2,6 +2,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
+import { useCustomerRealTime } from '@/hooks/useRealTimeData';
 import { 
   Building2, 
   TrendingUp, 
@@ -19,6 +20,9 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 
 export default function CustomerDashboard() {
   const { user } = useAuth();
+
+  // Enable real-time data updates
+  useCustomerRealTime(user?.company_id);
 
   const { data: dashboardData, isLoading, error } = useQuery({
     queryKey: ['customerDashboard', user?.company_id],

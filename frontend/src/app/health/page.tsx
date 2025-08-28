@@ -1,3 +1,5 @@
+
+
 "use client";
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -16,9 +18,13 @@ import { Input } from '@/components/ui/input';
 import { AlertTriangle, Activity, ShieldCheck, Search, BarChart3, TrendingUp, Zap } from 'lucide-react';
 import { HealthRiskChart } from '@/components/charts/HealthRiskChart';
 import { PerformanceScoreChart } from '@/components/charts/PerformanceScoreChart';
-import { HealthTrendChart } from '@/components/charts/HealthTrendChart';
+import { useHealthRealTime } from '@/hooks/useRealTimeData';
+// import { HealthTrendChart } from '@/components/charts/HealthTrendChart';
 
 export default function HealthPage() {
+  // Enable real-time data updates
+  useHealthRealTime();
+
   const { data, isLoading, error, refetch } = useQuery({ 
     queryKey: ['health'], 
     queryFn: api.getHealth, 
@@ -201,10 +207,9 @@ export default function HealthPage() {
           <h2 className="text-xl font-semibold">Health Analytics Dashboard</h2>
         </div>
         
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <HealthRiskChart data={rows} />
           <PerformanceScoreChart data={rows} />
-          <HealthTrendChart data={rows} />
         </div>
       </div>
 

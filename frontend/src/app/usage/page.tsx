@@ -10,6 +10,8 @@ import { SiteUsageChart } from '@/components/charts/SiteUsageChart';
 import { Clock, Fuel, MapPin, Activity, TrendingUp, AlertTriangle } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { RawMetricsTable } from '@/components/RawMetricsTable';
+import { useUsageRealTime } from '@/hooks/useRealTimeData';
+import { RealTimeIndicator } from '@/components/RealTimeIndicator';
 
 // Dynamic import for map to avoid SSR issues
 const UsageMap = dynamic(() => import('@/components/UsageMap').then(mod => ({ default: mod.UsageMap })), {
@@ -22,6 +24,9 @@ const UsageMap = dynamic(() => import('@/components/UsageMap').then(mod => ({ de
 });
 
 export default function UsagePage() {
+  // Enable real-time data updates
+  useUsageRealTime();
+
   const { 
     data: analytics, 
     isLoading: analyticsLoading, 
@@ -98,7 +103,8 @@ export default function UsagePage() {
                 Runtime tracking, fuel consumption, and operational insights
               </p>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-6">
+              <RealTimeIndicator intervalMs={30000} />
               <div className="text-right">
                 <div className="text-2xl font-bold text-white">
                   {Number(analytics?.runtime?.active_machines) || 0}
