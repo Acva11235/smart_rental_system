@@ -4,6 +4,7 @@ import "./globals.css";
 import Providers from "./providers";
 import { AuthProvider } from "@/contexts/AuthContext";
 import AdminLayout from "@/components/AdminLayout";
+import AppRouter from "@/components/AppRouter";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,9 +31,11 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen`}>
         <AuthProvider>
           <Providers>
-            <AdminLayout>
-              {children}
-            </AdminLayout>
+            <AppRouter>
+              <AdminLayout>
+                {children}
+              </AdminLayout>
+            </AppRouter>
           </Providers>
         </AuthProvider>
       </body>

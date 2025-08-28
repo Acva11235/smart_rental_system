@@ -4,7 +4,7 @@ import { api } from '@/lib/api';
 import Loader from '@/components/Loader';
 import ErrorState from '@/components/ErrorState';
 import { KpiCard } from '@/components/KpiCard';
-import AuthGuard from '@/components/AuthGuard';
+
 import dynamic from 'next/dynamic';
 
 const FleetMap = dynamic(() => import('@/components/Map').then(mod => ({ default: mod.FleetMap })), {
@@ -234,9 +234,5 @@ function FleetDashboard() {
 }
 
 export default function Page() {
-  return (
-    <AuthGuard>
-      <FleetDashboard />
-    </AuthGuard>
-  );
+  return <FleetDashboard />;
 }

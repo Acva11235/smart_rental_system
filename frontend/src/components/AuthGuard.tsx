@@ -9,10 +9,11 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isLoading && !user) {
-      router.push('/auth');
+      router.replace('/auth');
     }
   }, [user, isLoading, router]);
 
+  // Show loading screen while checking auth
   if (isLoading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -24,8 +25,16 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // If no user and not loading, don't render anything (redirect is happening)
   if (!user) {
-    return null; // Will redirect to auth
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-400">Redirecting to login...</p>
+        </div>
+      </div>
+    );
   }
 
   return <>{children}</>;
