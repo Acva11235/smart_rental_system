@@ -7,8 +7,8 @@ from sklearn.neighbors import NearestNeighbors
 # Paths and fixed inputs
 # Tip: use a raw string for Windows paths to avoid backslash escapes
 csv_path = Path(r"AIML\company_cluster_features.csv")
-company_id = 1
-asset_col = "avg_cranes"   # for 'crane'
+company_id = 21
+asset_col = "avg_excavators"   # for 'crane'
 current_rented = 1
 k = 5
 
