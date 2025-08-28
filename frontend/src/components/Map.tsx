@@ -29,26 +29,62 @@ const statusToColor = (status: AssetRow['status']): string => {
 };
 
 export function FleetMap({ assets, onSelect }: { assets: AssetRow[]; onSelect?: (a: AssetRow) => void }) {
-  const center: [number, number] = assets.length
-    ? [assets[0].current_location_lat, assets[0].current_location_lon]
-    : [20, 0];
+  // Filter out invalid coordinates
+  const validAssets = assets.filter(a => 
+    Number(a.current_location_lat) !== 99.99999999 && 
+    Number(a.current_location_lon) !== 99.99999999 &&
+    !isNaN(Number(a.current_location_lat)) &&
+    !isNaN(Number(a.current_location_lon))
+  );
+
+  const center: [number, number] = validAssets.length
+    ? [Number(validAssets[0].current_location_lat), Number(validAssets[0].current_location_lon)]
+    : [20.5937, 78.9629]; // Center of India as default
+
   return (
-    <div className="w-full h-96 rounded-md overflow-hidden">
-      <MapContainer center={center} zoom={4} style={{ height: '100%', width: '100%' }}>
-        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
-        {assets.map(a => (
-          <Marker key={a.machine_id} position={[a.current_location_lat, a.current_location_lon] as [number, number]}
+    <div className="w-full h-full rounded-lg overflow-hidden border border-border/50">
+      <MapContainer center={center} zoom={5} style={{ height: '100%', width: '100%' }}>
+        <TileLayer 
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" 
+          attribution="&copy; OpenStreetMap contributors" 
+        />
+        {validAssets.map((a, index) => (
+          <Marker 
+            key={`${a.machine_id}-${index}`} 
+            position={[Number(a.current_location_lat), Number(a.current_location_lon)] as [number, number]}
             icon={L.divIcon({
               className: 'custom-marker',
-              html: `<div style="background:${statusToColor(a.status)};width:12px;height:12px;border-radius:50%;border:2px solid white;box-shadow:0 0 2px rgba(0,0,0,.4)"></div>`
+              html: `<div style="background:${statusToColor(a.status)};width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,.3);transition:all 0.2s ease"></div>`
             })}
-            eventHandlers={{ click: () => onSelect?.(a) }}
+            eventHandlers={{ 
+              click: () => onSelect?.(a),
+              mouseover: (e) => {
+                e.target.getElement().style.transform = 'scale(1.2)';
+              },
+              mouseout: (e) => {
+                e.target.getElement().style.transform = 'scale(1)';
+              }
+            }}
           >
-            <Popup>
-              <div className="text-sm">
-                <div className="font-medium">{a.asset_type} #{a.machine_id}</div>
-                <div className="text-xs text-muted-foreground">{a.manufacturer} • {a.year_of_manufacture}</div>
-                <div className="text-xs mt-1 capitalize">Status: {a.status.replace('_',' ')}</div>
+            <Popup className="custom-popup">
+              <div className="text-sm min-w-[200px]">
+                <div className="font-semibold text-base text-gray-900 mb-2">
+                  {a.asset_type.charAt(0).toUpperCase() + a.asset_type.slice(1)} #{a.machine_id}
+                </div>
+                <div className="space-y-1 text-xs text-gray-600">
+                  <div><strong>Manufacturer:</strong> {a.manufacturer}</div>
+                  <div><strong>Year:</strong> {a.year_of_manufacture}</div>
+                  <div><strong>Status:</strong> 
+                    <span className={`ml-1 px-2 py-0.5 rounded text-white text-[10px] ${
+                      a.status === 'available' ? 'bg-green-500' :
+                      a.status === 'rented' ? 'bg-blue-500' : 'bg-yellow-500'
+                    }`}>
+                      {a.status.replace('_', ' ').toUpperCase()}
+                    </span>
+                  </div>
+                  {a.currentRenter && <div><strong>Renter:</strong> {a.currentRenter}</div>}
+                  <div><strong>Rate:</strong> {Number(a.rental_price_per_day).toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}/day</div>
+                </div>
               </div>
             </Popup>
           </Marker>

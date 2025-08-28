@@ -1,6 +1,6 @@
-import { AssetsResponse, HealthRow, MachineDetail, UsageRow, ForecastRow, CustomerRow, ApiError } from '@/lib/types';
+import { AssetsResponse, HealthRow, MachineDetail, UsageRow, ForecastRow, CustomerRow, DashboardAnalytics, UsageAnalytics, AdvancedForecastData, ApiError } from '@/lib/types';
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5001';
 
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
   const url = `${BASE_URL}${path}`;
@@ -25,8 +25,11 @@ export const api = {
   getHealth: () => http<HealthRow[]>('/api/health'),
   getMachineDetail: (machineId: number | string) => http<MachineDetail>(`/api/health/${machineId}`),
   getUsage: () => http<UsageRow[]>('/api/usage'),
+  getUsageAnalytics: () => http<UsageAnalytics>('/api/usage/analytics'),
   getForecast: () => http<ForecastRow[]>('/api/forecast'),
+  getAdvancedForecast: () => http<AdvancedForecastData>('/api/forecast/advanced'),
   getCustomers: () => http<CustomerRow[]>('/api/customers'),
+  getDashboardAnalytics: () => http<DashboardAnalytics>('/api/dashboard/analytics'),
 };
 
 

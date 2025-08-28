@@ -31,8 +31,8 @@ export function UsageMap({ rows }: { rows: (UsageRow & { idlePct: number; locati
     <div className="w-full h-96 rounded-md overflow-hidden">
       <MapContainer center={center} zoom={4} style={{ height: '100%', width: '100%' }}>
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
-        {rows.map((r) => (
-          <Marker key={r.machine_id} position={[r.location_lat, r.location_lon] as [number, number]} icon={L.divIcon({
+        {rows.map((r, index) => (
+          <Marker key={`${r.machine_id}-${index}`} position={[r.location_lat, r.location_lon] as [number, number]} icon={L.divIcon({
             className: 'usage-marker',
             html: `<div style="background:${statusColor(r.utilization_status)};width:12px;height:12px;border-radius:50%;border:2px solid white;box-shadow:0 0 2px rgba(0,0,0,.4)"></div>`
           })}>

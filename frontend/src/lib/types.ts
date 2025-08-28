@@ -97,4 +97,120 @@ export type CustomerRow = {
 
 export type ApiError = { message: string; status?: number };
 
+export interface DashboardAnalytics {
+  assetTypes: Array<{
+    asset_type: string;
+    total: number;
+    available: number;
+    used: number;
+  }>;
+  availability: {
+    available: number;
+    unavailable: number;
+  };
+  billing: {
+    completed: number;
+    pending: number;
+    unknown: number;
+  };
+  contracts: {
+    completed: number;
+    ongoing: number;
+    overdue: number;
+  };
+}
+
+export interface UsageAnalytics {
+  runtime: {
+    total_runtime_hours: number;
+    total_productive_hours: number;
+    total_idle_hours: number;
+    avg_fuel_rate: number;
+    active_machines: number;
+  };
+  rental: {
+    total_rental_hours: number;
+    total_contracts: number;
+    active_contracts: number;
+  };
+  siteUsage: Array<{
+    site: string;
+    machines_count: number;
+    site_runtime_hours: number;
+    avg_fuel_consumption: number;
+  }>;
+  fuelByType: Array<{
+    asset_type: string;
+    avg_fuel_rate: number;
+    total_hours: number;
+    machine_count: number;
+  }>;
+  dailyTrends: Array<{
+    date: string;
+    productive_hours: number;
+    idle_hours: number;
+    avg_fuel_rate: number;
+    active_machines: number;
+  }>;
+  downtime: {
+    total_incidents: number;
+    critical_incidents: number;
+    avg_error_frequency: number;
+  };
+}
+
+export interface AdvancedForecastData {
+  demandPredictions: Array<{
+    asset_type: string;
+    location: string;
+    month: number;
+    predicted_demand: number;
+    expected_duration: number;
+    trend_factor: number;
+    demand_category: string;
+  }>;
+  projectDNA: Array<{
+    industry: string;
+    equipment_combo: string;
+    pattern_frequency: number;
+    typical_duration: number;
+    success_probability: number;
+    pattern_confidence: string;
+  }>;
+  competitiveActivity: Array<{
+    asset_type: string;
+    recent_bookings: number;
+    unique_companies: number;
+    avg_rental_days: number;
+    normal_weekly_average: number;
+    activity_spike_pct: number;
+    alert_level: string;
+  }>;
+  economicIndicators: Array<{
+    indicator: string;
+    region: string;
+    current_value: number;
+    trend: string;
+    impact_on_demand: string;
+    equipment_affected: string[];
+  }>;
+  tradingFloor: Array<{
+    asset_type: string;
+    available_units: number;
+    total_bookings: number;
+    future_bookings: number;
+    competing_companies: number;
+    demand_pressure_pct: number;
+    market_status: string;
+    suggested_bid_price: number;
+  }>;
+  collaborativeInsights: Array<{
+    shared_by: string;
+    insight: string;
+    equipment_type: string;
+    confidence_level: number;
+    impact_timeframe: string;
+    region: string;
+  }>;
+}
 

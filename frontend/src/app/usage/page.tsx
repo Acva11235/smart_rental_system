@@ -1,100 +1,306 @@
 "use client";
-import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import Loader from '@/components/Loader';
 import ErrorState from '@/components/ErrorState';
-import { DataTable } from '@/components/DataTable';
-import { ColumnDef } from '@tanstack/react-table';
-import { UsageRow } from '@/lib/types';
-import { toNum, relativeTimeFromIso } from '@/lib/format';
-import { Button } from '@/components/ui/button';
+import { RuntimeChart } from '@/components/charts/RuntimeChart';
+import { FuelAnalysisChart } from '@/components/charts/FuelAnalysisChart';
+import { DailyUsageTrendChart } from '@/components/charts/DailyUsageTrendChart';
+import { SiteUsageChart } from '@/components/charts/SiteUsageChart';
+import { Clock, Fuel, MapPin, Activity, TrendingUp, AlertTriangle } from 'lucide-react';
 import dynamic from 'next/dynamic';
-const DynamicUsageMap = dynamic(() => import('@/components/UsageMap').then(m => m.UsageMap), { ssr: false });
+import { RawMetricsTable } from '@/components/RawMetricsTable';
+
+// Dynamic import for map to avoid SSR issues
+const UsageMap = dynamic(() => import('@/components/UsageMap').then(mod => ({ default: mod.UsageMap })), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-96 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl flex items-center justify-center border border-gray-200">
+      <div className="text-gray-500">Loading interactive map...</div>
+    </div>
+  )
+});
 
 export default function UsagePage() {
-  const { data, isLoading, error, refetch } = useQuery({ queryKey: ['usage'], queryFn: api.getUsage, refetchInterval: 30_000, staleTime: 10_000 });
-  const [idleThreshold, setIdleThreshold] = useState<number>(50);
-  const [utilStatus, setUtilStatus] = useState<string>('All');
+  const { 
+    data: analytics, 
+    isLoading: analyticsLoading, 
+    error: analyticsError 
+  } = useQuery({
+    queryKey: ['usageAnalytics'],
+    queryFn: api.getUsageAnalytics
+  });
 
-  const enriched = (data || []).map((r) => ({
-    ...r,
-    location_lat: toNum(r.location_lat),
-    location_lon: toNum(r.location_lon),
-    idlePct: (() => {
-      const p = toNum(r.productive_time_mins);
-      const i = toNum(r.idle_time_mins);
-      const d = p + i;
-      return d === 0 ? 0 : (i / d) * 100;
-    })(),
-  }));
+  const { 
+    data: usageData, 
+    isLoading: usageLoading, 
+    error: usageError 
+  } = useQuery({
+    queryKey: ['usage'],
+    queryFn: api.getUsage
+  });
 
-  const filtered = enriched.filter((r) => (utilStatus === 'All' || r.utilization_status === utilStatus) && r.idlePct >= idleThreshold);
+  if (analyticsLoading || usageLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
+        <Loader />
+      </div>
+    );
+  }
 
-  const columns: ColumnDef<UsageRow & { idlePct: number }>[] = useMemo(() => [
-    { header: 'Machine', accessorKey: 'name' },
-    { header: 'Time', cell: ({ row }) => relativeTimeFromIso(row.original.timestamp) },
-    { header: 'Productive mins', accessorKey: 'productive_time_mins' },
-    { header: 'Idle mins', accessorKey: 'idle_time_mins' },
-    { header: 'Idle %', cell: ({ row }) => row.original.idlePct.toFixed(0) + '%' },
-    { header: 'RPM var', accessorKey: 'rpm_variance' },
-    { header: 'Overspeed', accessorKey: 'over_speed_events' },
-    { header: 'Utilization Status', accessorKey: 'utilization_status' },
-  ], []);
+  if (analyticsError || usageError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
+        <ErrorState error="Failed to load usage analytics data" />
+      </div>
+    );
+  }
 
-  const exportCsv = () => {
-    const headers = ['Machine','Time','Productive mins','Idle mins','Idle %','RPM var','Overspeed','Utilization Status'];
-    const rows = filtered.map(r => [
-      r.name,
-      r.timestamp,
-      r.productive_time_mins,
-      r.idle_time_mins,
-      r.idlePct.toFixed(0),
-      r.rpm_variance,
-      r.over_speed_events,
-      r.utilization_status,
-    ]);
-    const csv = [headers, ...rows].map(arr => arr.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `usage_export.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+  // Process usage data for map
+  const mapData = usageData
+    ?.filter(row => 
+      row.location_lat && 
+      row.location_lon && 
+      Number(row.location_lat) !== 99.99999999 && 
+      Number(row.location_lon) !== 99.99999999
+    )
+    .map(row => {
+      const productiveMins = Number(row.productive_time_mins) || 0;
+      const idleMins = Number(row.idle_time_mins) || 0;
+      const totalMins = productiveMins + idleMins;
+      
+      return {
+        ...row,
+        location_lat: Number(row.location_lat),
+        location_lon: Number(row.location_lon),
+        idlePct: totalMins > 0 ? (idleMins / totalMins) * 100 : 0
+      };
+    }) || [];
+
+  // Calculate key metrics
+  const totalRentalHours = Number(analytics?.rental?.total_rental_hours) || 0;
+  const totalRuntimeHours = Number(analytics?.runtime?.total_runtime_hours) || 0;
+  const utilizationRate = totalRentalHours > 0 ? (totalRuntimeHours / totalRentalHours) * 100 : 0;
+  const downTimeIncidents = Number(analytics?.downtime?.total_incidents) || 0;
+  const avgFuelRate = Number(analytics?.runtime?.avg_fuel_rate) || 0;
 
   return (
-    <div className="space-y-4">
-      {isLoading && <Loader/>}
-      {error && <ErrorState error={error} retry={refetch}/>}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <div className="text-sm font-medium mb-2">Live Map</div>
-          <DynamicUsageMap rows={enriched} />
-        </div>
-        <div>
-          <div className="flex gap-4 items-center text-sm">
-            <label className="flex items-center gap-2">Idle% ≥
-              <input className="border px-2 py-1 rounded w-16" type="number" value={idleThreshold} onChange={(e) => setIdleThreshold(Number(e.target.value))} />
-            </label>
-            <label className="flex items-center gap-2">Utilization
-              <select className="border px-2 py-1 rounded" value={utilStatus} onChange={(e) => setUtilStatus(e.target.value)}>
-                <option>All</option>
-                <option>Normal</option>
-                <option>Underutilized</option>
-                <option>Overutilized</option>
-              </select>
-            </label>
-            <Button variant="outline" size="sm" onClick={exportCsv}>Export CSV</Button>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
+      {/* Header */}
+      <div className="bg-black border-b border-gray-700 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                Usage Analytics
+              </h1>
+              <p className="mt-2 text-gray-300">
+                Runtime tracking, fuel consumption, and operational insights
+              </p>
+            </div>
+            <div className="flex items-center space-x-4">
+              <div className="text-right">
+                <div className="text-2xl font-bold text-white">
+                  {Number(analytics?.runtime?.active_machines) || 0}
+                </div>
+                <div className="text-sm text-gray-400">Active Machines</div>
+              </div>
+            </div>
           </div>
-          <div className="mt-3">
-            <DataTable columns={columns} data={filtered} />
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Key Metrics Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700 p-4 hover:shadow-lg transition-shadow">
+            <div className="flex items-center">
+              <div className="p-2 bg-blue-900/50 rounded-lg">
+                <Clock className="h-6 w-6 text-blue-400" />
+              </div>
+              <div className="ml-4">
+                <div className="text-2xl font-bold text-white">
+                  {totalRuntimeHours.toFixed(0)}h
+                </div>
+                <div className="text-sm text-gray-300">Total Runtime</div>
+                <div className="text-xs text-green-400 mt-1">
+                  {Number(analytics?.rental?.active_contracts) || 0} active contracts
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700 p-4 hover:shadow-lg transition-shadow">
+            <div className="flex items-center">
+              <div className="p-2 bg-green-900/50 rounded-lg">
+                <TrendingUp className="h-6 w-6 text-green-400" />
+              </div>
+              <div className="ml-4">
+                <div className="text-2xl font-bold text-white">
+                  {utilizationRate.toFixed(1)}%
+                </div>
+                <div className="text-sm text-gray-300">Utilization Rate</div>
+                <div className="text-xs text-blue-400 mt-1">
+                  Runtime vs Rental Hours
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700 p-4 hover:shadow-lg transition-shadow">
+            <div className="flex items-center">
+              <div className="p-2 bg-purple-900/50 rounded-lg">
+                <Fuel className="h-6 w-6 text-purple-400" />
+              </div>
+              <div className="ml-4">
+                <div className="text-2xl font-bold text-white">
+                  {avgFuelRate.toFixed(1)}
+                </div>
+                <div className="text-sm text-gray-300">Avg Fuel Rate</div>
+                <div className="text-xs text-purple-400 mt-1">
+                  Liters per hour
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700 p-4 hover:shadow-lg transition-shadow">
+            <div className="flex items-center">
+              <div className="p-2 bg-orange-900/50 rounded-lg">
+                <AlertTriangle className="h-6 w-6 text-orange-400" />
+              </div>
+              <div className="ml-4">
+                <div className="text-2xl font-bold text-white">
+                  {downTimeIncidents}
+                </div>
+                <div className="text-sm text-gray-300">Downtime Events</div>
+                <div className="text-xs text-orange-400 mt-1">
+                  Total incidents logged
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Charts Grid */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
+          {/* Runtime Analysis */}
+          <RuntimeChart data={analytics?.runtime || {
+            total_runtime_hours: 0,
+            total_productive_hours: 0,
+            total_idle_hours: 0,
+            avg_fuel_rate: 0,
+            active_machines: 0
+          }} />
+
+          {/* Fuel Analysis */}
+          <FuelAnalysisChart data={analytics?.fuelByType || []} />
+        </div>
+
+        {/* Daily Trends - Full Width */}
+        <div className="mb-6">
+          <DailyUsageTrendChart data={analytics?.dailyTrends || []} />
+        </div>
+
+        {/* Site Usage and Map */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
+          {/* Site Usage Chart */}
+          <div className="xl:col-span-2">
+            <SiteUsageChart data={analytics?.siteUsage || []} />
+          </div>
+
+          {/* Interactive Map */}
+          <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white flex items-center">
+                <MapPin className="h-5 w-5 mr-2 text-blue-400" />
+                Live Equipment Map
+              </h3>
+              <div className="text-sm text-gray-400">
+                {mapData.length} machines
+              </div>
+            </div>
+            
+            {/* Legend */}
+            <div className="flex items-center space-x-4 mb-4 text-xs">
+              <div className="flex items-center">
+                <div className="w-3 h-3 rounded-full bg-green-500 mr-1"></div>
+                <span className="text-gray-300">Normal</span>
+              </div>
+              <div className="flex items-center">
+                <div className="w-3 h-3 rounded-full bg-blue-400 mr-1"></div>
+                <span className="text-gray-300">Underutilized</span>
+              </div>
+              <div className="flex items-center">
+                <div className="w-3 h-3 rounded-full bg-red-500 mr-1"></div>
+                <span className="text-gray-300">Overutilized</span>
+              </div>
+            </div>
+
+            <UsageMap rows={mapData} />
+          </div>
+        </div>
+
+        {/* Raw Metrics Table */}
+        <div className="mb-6">
+          <RawMetricsTable data={usageData || []} />
+        </div>
+
+        {/* Additional Insights */}
+        <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700 p-6">
+          <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+            <Activity className="h-5 w-5 mr-2 text-green-400" />
+            Operational Summary
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="p-4 bg-gradient-to-r from-blue-900/50 to-blue-800/50 rounded-lg border border-blue-700/50">
+              <div className="text-lg font-semibold text-blue-300">Contract Overview</div>
+              <div className="mt-2 space-y-1">
+                <div className="text-sm text-blue-200">
+                  Total Contracts: {Number(analytics?.rental?.total_contracts) || 0}
+                </div>
+                <div className="text-sm text-blue-200">
+                  Active: {Number(analytics?.rental?.active_contracts) || 0}
+                </div>
+                <div className="text-sm text-blue-200">
+                  Total Rental Hours: {totalRentalHours.toFixed(0)}h
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-gradient-to-r from-green-900/50 to-green-800/50 rounded-lg border border-green-700/50">
+              <div className="text-lg font-semibold text-green-300">Runtime Efficiency</div>
+              <div className="mt-2 space-y-1">
+                <div className="text-sm text-green-200">
+                  Productive: {Number(analytics?.runtime?.total_productive_hours)?.toFixed(0) || 0}h
+                </div>
+                <div className="text-sm text-green-200">
+                  Idle: {Number(analytics?.runtime?.total_idle_hours)?.toFixed(0) || 0}h
+                </div>
+                <div className="text-sm text-green-200">
+                  Efficiency: {totalRuntimeHours > 0 ? ((Number(analytics?.runtime?.total_productive_hours) || 0) / totalRuntimeHours * 100).toFixed(1) : 0}%
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-gradient-to-r from-purple-900/50 to-purple-800/50 rounded-lg border border-purple-700/50">
+              <div className="text-lg font-semibold text-purple-300">Maintenance Alerts</div>
+              <div className="mt-2 space-y-1">
+                <div className="text-sm text-purple-200">
+                  Total Incidents: {downTimeIncidents}
+                </div>
+                <div className="text-sm text-purple-200">
+                  Critical: {Number(analytics?.downtime?.critical_incidents) || 0}
+                </div>
+                <div className="text-sm text-purple-200">
+                  Avg Error Rate: {Number(analytics?.downtime?.avg_error_frequency)?.toFixed(1) || 0}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
   );
 }
-
-
