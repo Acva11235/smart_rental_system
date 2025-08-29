@@ -11,6 +11,7 @@ const navItems = [
   { name: "Health", href: "/health" },
   { name: "Usage", href: "/usage" },
   { name: "Forecast", href: "/forecast" },
+  { name: "Insurance", href: "/admin/insurance" },
   { name: "Customers", href: "/customers" },
 ];
 

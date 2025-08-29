@@ -493,6 +493,254 @@ app.get('/api/forecast/advanced', async (req, res) => {
   }
 });
 
+app.post('/api/customers/:companyId/segment', async (req, res) => {
+  const { companyId } = req.params;
+
+  try {
+      // Step 1: Fetch the calculated metrics for the specific company
+      const metricsQuery = `
+          WITH ContractMetrics AS (
+              SELECT
+                  company_id,
+                  COUNT(*) AS total_rentals,
+                  COUNT(CASE WHEN rental_status = 'overdue' THEN 1 END) AS overdue_rentals
+              FROM RentalContract
+              WHERE company_id = $1
+              GROUP BY company_id
+          ),
+          HealthMetrics AS (
+              SELECT
+                  rc.company_id,
+                  AVG(mha.safety_score) AS avg_safety_score,
+                  AVG(mha.wear_and_tear_index) AS avg_wear_index
+              FROM RentalContract rc
+              JOIN MachineHealthAnalytics mha ON rc.machine_id = mha.machine_id
+              WHERE rc.company_id = $1
+                AND mha.log_timestamp BETWEEN rc.actual_start_date AND rc.actual_end_date
+              GROUP BY rc.company_id
+          )
+          SELECT
+              COALESCE(cm.total_rentals, 0) AS "totalRentals",
+              CASE
+                  WHEN COALESCE(cm.total_rentals, 0) > 0
+                  THEN (1 - (COALESCE(cm.overdue_rentals, 0)::FLOAT / cm.total_rentals::FLOAT)) * 100
+                  ELSE 100
+              END AS "onTimeReturnRate",
+              COALESCE(hm.avg_safety_score, 100) AS "avgSafetyScore",
+              COALESCE(hm.avg_wear_index, 100) AS "avgWearIndex"
+          FROM (SELECT $1::int as company_id) AS cid
+          LEFT JOIN ContractMetrics cm ON cid.company_id = cm.company_id
+          LEFT JOIN HealthMetrics hm ON cid.company_id = hm.company_id;
+      `;
+      const { rows } = await pool.query(metricsQuery, [companyId]);
+      
+      if (rows.length === 0) {
+          return res.status(404).json({ message: "Could not calculate metrics for company. It may have no rental history." });
+      }
+      const metrics = rows[0];
+
+      // Step 2: Apply segmentation logic
+      const onTimeScore = parseFloat(metrics.onTimeReturnRate);
+      const safetyScore = parseFloat(metrics.avgSafetyScore);
+      const wearScore = 100 - parseFloat(metrics.avgWearIndex);
+
+      const healthScore = (onTimeScore * 0.4) + (safetyScore * 0.3) + (wearScore * 0.3);
+
+      let newSegment = 'Standard';
+      if (healthScore >= 85) {
+          newSegment = 'High Value';
+      } else if (healthScore >= 70) {
+          newSegment = 'Growth Potential';
+      } else if (healthScore < 50) {
+          newSegment = 'High Risk';
+      }
+      
+      if (metrics.totalRentals > 50 && newSegment === 'Growth Potential') {
+          newSegment = 'High Value';
+      }
+      if (metrics.totalRentals > 20 && newSegment === 'Standard') {
+          newSegment = 'Growth Potential';
+      }
+
+      // Step 3: Update the segment in the database
+      const updateQuery = 'UPDATE Company SET segment = $1 WHERE company_id = $2 RETURNING *';
+      const { rows: updatedCompany } = await pool.query(updateQuery, [newSegment, companyId]);
+
+      res.json({
+          message: `Company segment updated to ${newSegment}`,
+          company: updatedCompany[0],
+          calculatedMetrics: { ...metrics, healthScore: healthScore.toFixed(2) }
+      });
+
+  } catch (error) {
+      console.error('Error updating customer segment:', error);
+      res.status(500).json({ message: "Error updating customer segment", error: error.message });
+  }
+});
+
+// --- NEW: Recalculate Segments for ALL Companies ---
+app.post('/api/customers/segment/recalculate-all', async (req, res) => {
+  try {
+      // This single, powerful query calculates metrics for all companies,
+      // determines their new segment based on the CASE logic,
+      // and updates the Company table all at once.
+      const updateQuery = `
+          WITH Metrics AS (
+              SELECT
+                  c.company_id,
+                  COALESCE(cm.total_rentals, 0) AS "totalRentals",
+                  CASE
+                      WHEN COALESCE(cm.total_rentals, 0) > 0
+                      THEN (1 - (COALESCE(cm.overdue_rentals, 0)::FLOAT / cm.total_rentals::FLOAT)) * 100
+                      ELSE 100
+                  END AS "onTimeReturnRate",
+                  COALESCE(hm.avg_safety_score, 100) AS "avgSafetyScore",
+                  COALESCE(hm.avg_wear_index, 0) AS "avgWearIndex"
+              FROM Company c
+              LEFT JOIN (
+                  SELECT company_id, COUNT(*) as total_rentals, COUNT(CASE WHEN rental_status = 'overdue' THEN 1 END) as overdue_rentals
+                  FROM RentalContract GROUP BY company_id
+              ) cm ON c.company_id = cm.company_id
+              LEFT JOIN (
+                  SELECT rc.company_id, AVG(mha.safety_score) AS avg_safety_score, AVG(mha.wear_and_tear_index) AS avg_wear_index
+                  FROM RentalContract rc JOIN MachineHealthAnalytics mha ON rc.machine_id = mha.machine_id
+                  WHERE mha.log_timestamp BETWEEN rc.actual_start_date AND rc.actual_end_date
+                  GROUP BY rc.company_id
+              ) hm ON c.company_id = hm.company_id
+          ),
+          Scores AS (
+              SELECT
+                  company_id,
+                  "totalRentals",
+                  ("onTimeReturnRate" * 0.4) + ("avgSafetyScore" * 0.3) + ((100 - "avgWearIndex") * 0.3) AS "healthScore"
+              FROM Metrics
+          ),
+          Segments AS (
+              SELECT
+                  company_id,
+                  CASE
+                      WHEN "healthScore" >= 85 THEN 'High Value'
+                      WHEN "healthScore" >= 70 THEN 'Growth Potential'
+                      WHEN "healthScore" < 50 THEN 'High Risk'
+                      ELSE 'Standard'
+                  END AS "baseSegment",
+                  "totalRentals"
+              FROM Scores
+          )
+          UPDATE Company
+          SET segment = CASE
+                          WHEN s."totalRentals" > 50 AND s."baseSegment" = 'Growth Potential' THEN 'High Value'
+                          WHEN s."totalRentals" > 20 AND s."baseSegment" = 'Standard' THEN 'Growth Potential'
+                          ELSE s."baseSegment"
+                        END
+          FROM Segments s
+          WHERE Company.company_id = s.company_id;
+      `;
+
+      const { rowCount } = await pool.query(updateQuery);
+
+      res.json({
+          message: `Successfully recalculated and updated segments for ${rowCount} companies.`
+      });
+
+  } catch (error) {
+      console.error('Error recalculating all customer segments:', error);
+      res.status(500).json({ message: "Error during bulk segment update", error: error.message });
+  }
+});
+// Customer notification endpoints for rental expiry
+app.get('/api/customer/rental-notifications/:customerId', async (req, res) => {
+  const { customerId } = req.params;
+  
+  try {
+    const [notifications] = await pool.query(
+      `SELECT cn.*, m.asset_type, m.manufacturer 
+       FROM customer_notifications cn
+       LEFT JOIN Machine m ON cn.machine_id = m.machine_id
+       WHERE cn.customer_id = ? 
+       ORDER BY cn.is_urgent DESC, cn.created_at DESC`,
+      [customerId]
+    );
+    res.json(notifications);
+  } catch (error) {
+    console.error('Customer notifications fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch notifications' });
+  }
+});
+
+// Mark customer notification as read
+app.put('/api/customer/rental-notifications/:notificationId/read', async (req, res) => {
+  const { notificationId } = req.params;
+  
+  try {
+    await pool.query(
+      'UPDATE customer_notifications SET is_read = TRUE, updated_at = NOW() WHERE id = ?',
+      [notificationId]
+    );
+    res.json({ message: 'Notification marked as read' });
+  } catch (error) {
+    console.error('Mark customer notification read error:', error);
+    res.status(500).json({ error: 'Failed to mark notification as read' });
+  }
+});
+
+// Auto-generate rental expiry notifications (called by cron or manually)
+app.post('/api/admin/generate-expiry-notifications', async (req, res) => {
+  try {
+    // Find all active rentals expiring in 5 days or less
+    const [expiringRentals] = await pool.query(`
+      SELECT rc.*, m.asset_type, m.manufacturer, m.machine_id, c.name as company_name
+      FROM RentalContract rc
+      JOIN Machine m ON rc.machine_id = m.machine_id  
+      JOIN Company c ON rc.company_id = c.company_id
+      WHERE rc.rental_status = 'active' 
+      AND DATEDIFF(rc.end_date, CURDATE()) <= 5
+      AND DATEDIFF(rc.end_date, CURDATE()) >= 0
+    `);
+
+    let notificationsCreated = 0;
+
+    for (const rental of expiringRentals) {
+      const daysLeft = Math.ceil((new Date(rental.end_date) - new Date()) / (1000 * 60 * 60 * 24));
+      
+      // Check if notification already exists for this rental
+      const [existing] = await pool.query(
+        'SELECT id FROM customer_notifications WHERE rental_id = ? AND type = "rental_expiry"',
+        [rental.rental_id]
+      );
+
+      if (existing.length === 0) {
+        const title = `Rental Expiring ${daysLeft <= 1 ? 'Today' : `in ${daysLeft} days`}`;
+        const message = `Your rental for ${rental.asset_type} #${rental.machine_id} (${rental.manufacturer}) expires on ${rental.end_date}. Please contact us to extend or return the equipment.`;
+        
+        await pool.query(`
+          INSERT INTO customer_notifications 
+          (customer_id, type, title, message, rental_id, machine_id, expires_on, is_urgent)
+          VALUES (?, 'rental_expiry', ?, ?, ?, ?, ?, ?)
+        `, [
+          rental.company_id, // Using company_id as customer_id
+          title,
+          message,
+          rental.rental_id,
+          rental.machine_id,
+          rental.end_date,
+          daysLeft <= 2 ? true : false
+        ]);
+
+        notificationsCreated++;
+      }
+    }
+
+    res.json({ 
+      message: `Generated ${notificationsCreated} new expiry notifications`,
+      expiringRentals: expiringRentals.length
+    });
+  } catch (error) {
+    console.error('Generate expiry notifications error:', error);
+    res.status(500).json({ error: 'Failed to generate notifications' });
+  }
+});
+
 // Customers endpoint
 app.get('/api/customers', async (req, res) => {
   try {
@@ -803,6 +1051,156 @@ app.post('/api/anomaly/check', async (req, res) => {
   } catch (err) {
     console.error('Anomaly detection error:', err.message);
     res.status(500).json({ error: 'Failed to detect anomaly' });
+  }
+});
+
+// ================================
+// INSURANCE PRICING SYSTEM
+// ================================
+
+// Insurance pricing calculation functions (converted from Python)
+function basePrice(pList, segment, S, betaS = 0.20, kappa = 1.5, s0 = 0.5, cap = [0.85, 1.15]) {
+  const segMap = {
+    "HighValue": 0.92,
+    "Normal": 1.00,
+    "HighRisk": 1.08
+  };
+  
+  const MSeg = segMap[segment] || 1.00;
+  const s = Math.max(0.0, Math.min(1.0, S / 100.0));
+  let MSus = 1 - betaS * Math.tanh(kappa * (s - s0));
+  MSus = Math.min(Math.max(MSus, cap[0]), cap[1]);
+  
+  return pList * MSeg * MSus;
+}
+
+function expectedLossPerDay(pList, U, EL0Ratio = 0.003, EL1Ratio = 0.02, gamma = 1.5) {
+  const rho = Math.max(0.0, Math.min(1.0, (100.0 - U) / 100.0));
+  const EL0 = EL0Ratio * pList;
+  const EL1 = EL1Ratio * pList;
+  
+  return EL0 + (EL1 - EL0) * Math.pow(rho, gamma);
+}
+
+function insurancePremium(pList, U, d, theta = 0.25, eta = 0.0) {
+  const EL = expectedLossPerDay(pList, U);
+  return d * EL * (1 + theta) + eta * Math.sqrt(d * EL);
+}
+
+function finalPrice(pList, segment, S, U, d) {
+  const base = basePrice(pList, segment, S);
+  const prem = insurancePremium(pList, U, d);
+  return base * d + prem;
+}
+
+// Get machine pricing for insurance calculation
+app.get('/api/insurance/machines', async (req, res) => {
+  try {
+    const [machines] = await pool.query(`
+      SELECT DISTINCT asset_type, 
+             AVG(rental_price_per_day) as avg_daily_rate,
+             COUNT(*) as available_count
+      FROM Machine 
+      WHERE status = 'available'
+      GROUP BY asset_type
+      ORDER BY asset_type
+    `);
+    
+    res.json(machines);
+  } catch (error) {
+    console.error('Insurance machines fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch machine data' });
+  }
+});
+
+// Calculate insurance pricing
+app.post('/api/insurance/calculate', async (req, res) => {
+  try {
+    const { companyId, assetType, quantity, rentalDays } = req.body;
+    
+    if (!companyId || !assetType || !quantity || !rentalDays) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: companyId, assetType, quantity, rentalDays' 
+      });
+    }
+
+    // Get company details for segment and sustainability score
+    const [companyData] = await pool.query(
+      'SELECT segment, sustainability_score FROM Company WHERE company_id = ?',
+      [companyId]
+    );
+
+    if (companyData.length === 0) {
+      return res.status(404).json({ error: 'Company not found' });
+    }
+
+    const { segment, sustainability_score } = companyData[0];
+
+    // Get machine pricing
+    const [machineData] = await pool.query(
+      'SELECT AVG(rental_price_per_day) as avg_daily_rate FROM Machine WHERE asset_type = ?',
+      [assetType]
+    );
+
+    if (machineData.length === 0) {
+      return res.status(404).json({ error: 'Machine type not found' });
+    }
+
+    const avgDailyRate = parseFloat(machineData[0].avg_daily_rate);
+    
+    // Calculate utilization score (mock calculation - you can replace with actual logic)
+    const utilizationScore = Math.random() * 40 + 60; // Random between 60-100
+
+    // Perform insurance calculations
+    const pList = avgDailyRate;
+    const S = sustainability_score || 50; // Default to 50 if null
+    const U = utilizationScore;
+    const d = parseInt(rentalDays);
+    const qty = parseInt(quantity);
+
+    // Calculate prices
+    const basePricePerMachine = basePrice(pList, segment, S);
+    const insurancePremiumPerMachine = insurancePremium(pList, U, d);
+    const finalPricePerMachine = finalPrice(pList, segment, S, U, d);
+
+    // Calculate totals
+    const totalBasePrice = basePricePerMachine * d * qty;
+    const totalInsurancePremium = insurancePremiumPerMachine * qty;
+    const totalFinalPrice = finalPricePerMachine * qty;
+
+    // Calculate breakdown
+    const pricing = {
+      company: {
+        id: companyId,
+        segment: segment,
+        sustainabilityScore: S
+      },
+      machine: {
+        type: assetType,
+        quantity: qty,
+        rentalDays: d,
+        avgDailyRate: avgDailyRate,
+        utilizationScore: U
+      },
+      calculation: {
+        basePricePerMachinePerDay: basePricePerMachine.toFixed(2),
+        insurancePremiumPerMachine: insurancePremiumPerMachine.toFixed(2),
+        finalPricePerMachine: finalPricePerMachine.toFixed(2),
+        totalBasePrice: totalBasePrice.toFixed(2),
+        totalInsurancePremium: totalInsurancePremium.toFixed(2),
+        totalFinalPrice: totalFinalPrice.toFixed(2)
+      },
+      breakdown: {
+        baseRental: totalBasePrice.toFixed(2),
+        insuranceCoverage: totalInsurancePremium.toFixed(2),
+        grandTotal: totalFinalPrice.toFixed(2)
+      }
+    };
+
+    res.json(pricing);
+  } catch (error) {
+    console.error('Insurance calculation error:', error);
+    res.status(500).json({ error: 'Failed to calculate insurance pricing' });
   }
 });
 

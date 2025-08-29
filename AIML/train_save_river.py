@@ -6,7 +6,7 @@ import cloudpickle as pickle  # or pickle/dill
 
 from river import anomaly, preprocessing, compose
 
-CSV_PATH   = r"AIML\MachineSensorData_anomalies.csv"
+CSV_PATH   = r"/Users/vishnuadithya/Documents/Projects/caterpillars/smart_rental_system/AIML/MachineSensorData_anomalies.csv"
 MODEL_PATH = Path("hst_quantile_model.pkl")
 
 NUMERIC_COLS = [

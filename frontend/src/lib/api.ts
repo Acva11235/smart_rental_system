@@ -20,6 +20,7 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json();
 }
 
+
 export const api = {
   // Admin APIs
   getAssets: () => http<AssetsResponse>('/api/assets'),
@@ -65,6 +66,22 @@ export const api = {
         company_id: companyId, 
         asset: asset, 
         current_rented: currentRented 
+      })
+    }),
+  
+  // Insurance pricing APIs
+  getInsuranceMachines: () => 
+    http<any[]>('/api/insurance/machines'),
+  
+  calculateInsurance: (companyId: number, assetType: string, quantity: number, rentalDays: number) =>
+    http<any>('/api/insurance/calculate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        companyId, 
+        assetType, 
+        quantity, 
+        rentalDays 
       })
     }),
 };

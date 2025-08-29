@@ -249,22 +249,7 @@ export default function AuthPage() {
             </button>
           </form>
 
-          {/* Demo Credentials */}
-          {isLogin && (
-            <div className="mt-6 pt-6 border-t border-border">
-              <h4 className="text-sm font-medium text-card-foreground mb-3">Demo Credentials:</h4>
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between items-center p-2 bg-muted rounded">
-                  <span className="text-muted-foreground">Admin:</span>
-                  <span className="text-primary">admin / admin</span>
-                </div>
-                <div className="flex justify-between items-center p-2 bg-muted rounded">
-                  <span className="text-muted-foreground">Customer:</span>
-                  <span className="text-accent">demo_user / password123</span>
-                </div>
-              </div>
-            </div>
-          )}
+         
         </div>
 
         {/* Footer */}

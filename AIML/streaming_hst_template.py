@@ -12,7 +12,7 @@ import numpy as np
 from river import anomaly, preprocessing
 
 # Windows-safe path; adjust if needed
-CSV_PATH = r"AIML\MachineSensorData_anomalies.csv"
+CSV_PATH = "/Users/vishnuadithya/Documents/Projects/caterpillars/smart_rental_system/AIML/MachineSensorData_anomalies.csv"
 TIME_COL = "timestamp"
 ID_COL = "machine_id"
 
@@ -40,7 +40,7 @@ def main():
     assert hasattr(hst, "score_one") and hasattr(hst, "learn_one")
 
     buffer = deque(maxlen=1000)
-    q = 0.995  # 99.5th percentile threshold
+    q = 0.80  
 
     out_path = Path("stream_scores.csv")
     with open(CSV_PATH, "r", newline="", encoding="utf-8") as f_in, open(out_path, "w", newline="", encoding="utf-8") as f_out:

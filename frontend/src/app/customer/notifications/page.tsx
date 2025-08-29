@@ -1,57 +1,43 @@
 "use client";
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@/contexts/AuthContext';
-import { api } from '@/lib/api';
 import { 
   Bell, 
   CheckCircle, 
   AlertTriangle, 
-  CreditCard, 
-  FileText, 
-  Settings,
-  Clock,
-  MoreVertical,
-  X,
-  MarkdownIcon
+  Clock
 } from 'lucide-react';
-import { Notification } from '@/lib/types';
 
-export default function NotificationsPage() {
-  const { user } = useAuth();
-  const queryClient = useQueryClient();
+// Static demo notifications for demo_user
+const demoNotifications = [
+  {
+    id: 1,
+    type: 'rental_expiry',
+    title: 'Rental Expiring Soon',
+    message: 'Your rental for Excavator #101 expires in 3 days on 2024-12-22. Please contact us to extend or return the equipment.',
+    is_read: false,
+    is_urgent: true,
+    asset_type: 'Excavator',
+    machine_id: 101,
+    expires_on: '2024-12-22',
+    created_at: '2024-12-19T10:30:00Z',
+    contract_id: 'CTR-2024-001'
+  }
+];
+
+export default function CustomerNotificationsPage() {
   const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('all');
-
-  const { data: notifications = [], isLoading } = useQuery({
-    queryKey: ['notifications', user?.id],
-    queryFn: () => user ? api.getNotifications(Number(user.id)) : [],
-    enabled: !!user,
-    refetchInterval: 30000, // Refresh every 30 seconds
-  });
-
-  const markAsReadMutation = useMutation({
-    mutationFn: (notificationId: number) => api.markNotificationRead(notificationId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
-    },
-  });
+  const [notifications, setNotifications] = useState(demoNotifications);
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
-      case 'payment_due': return CreditCard;
-      case 'contract_renewal': return FileText;
-      case 'maintenance_alert': return Settings;
-      case 'checkout_reminder': return AlertTriangle;
+      case 'rental_expiry': return AlertTriangle;
       default: return Bell;
     }
   };
 
   const getNotificationColor = (type: string) => {
     switch (type) {
-      case 'payment_due': return 'text-red-400 bg-red-900/30 border-red-700';
-      case 'contract_renewal': return 'text-blue-400 bg-blue-900/30 border-blue-700';
-      case 'maintenance_alert': return 'text-orange-400 bg-orange-900/30 border-orange-700';
-      case 'checkout_reminder': return 'text-yellow-400 bg-yellow-900/30 border-yellow-700';
+      case 'rental_expiry': return 'text-red-400 bg-red-900/30 border-red-700';
       default: return 'text-gray-400 bg-gray-900/30 border-gray-700';
     }
   };
@@ -76,19 +62,10 @@ export default function NotificationsPage() {
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   const handleMarkAsRead = (notificationId: number) => {
-    markAsReadMutation.mutate(notificationId);
-  };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading notifications...</p>
-        </div>
-      </div>
+    setNotifications(prev => 
+      prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
     );
-  }
+  };
 
   return (
     <div className="min-h-screen bg-black">
@@ -102,7 +79,7 @@ export default function NotificationsPage() {
                 Notifications
               </h1>
               <p className="text-gray-400 mt-2">
-                Stay updated with your equipment rentals and account activity
+                Welcome, demo_user! Here are your latest updates and alerts
               </p>
             </div>
             {unreadCount > 0 && (
@@ -146,8 +123,8 @@ export default function NotificationsPage() {
         <div className="space-y-4">
           {filteredNotifications.length > 0 ? (
             filteredNotifications.map((notification) => {
-              const IconComponent = getNotificationIcon(notification.notification_type);
-              const colorClasses = getNotificationColor(notification.notification_type);
+              const IconComponent = getNotificationIcon(notification.type);
+              const colorClasses = getNotificationColor(notification.type);
               
               return (
                 <div
@@ -168,9 +145,16 @@ export default function NotificationsPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <h3 className="text-lg font-semibold text-white capitalize">
-                            {notification.notification_type.replace('_', ' ')}
-                          </h3>
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="text-lg font-semibold text-white">
+                              {notification.title}
+                            </h3>
+                            {notification.is_urgent && (
+                              <span className="px-2 py-1 bg-red-600 text-white text-xs rounded-full">
+                                Urgent
+                              </span>
+                            )}
+                          </div>
                           <p className="text-gray-300 mt-1 leading-relaxed">
                             {notification.message}
                           </p>
@@ -178,12 +162,18 @@ export default function NotificationsPage() {
                           <div className="flex items-center mt-3 space-x-4">
                             <span className="flex items-center text-sm text-gray-400">
                               <Clock className="h-4 w-4 mr-1" />
-                              {formatTimeAgo(notification.sent_at)}
+                              {formatTimeAgo(notification.created_at)}
                             </span>
                             
                             {notification.contract_id && (
                               <span className="text-sm text-gray-400">
                                 Contract #{notification.contract_id}
+                              </span>
+                            )}
+
+                            {notification.asset_type && (
+                              <span className="text-sm text-gray-400">
+                                {notification.asset_type} #{notification.machine_id}
                               </span>
                             )}
                           </div>
@@ -231,13 +221,8 @@ export default function NotificationsPage() {
           )}
         </div>
 
-        {/* Auto-refresh indicator */}
-        <div className="mt-8 text-center">
-          <p className="text-sm text-gray-500">
-            <span className="inline-block w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
-            Auto-refreshing every 30 seconds
-          </p>
-        </div>
+     
+        
       </div>
     </div>
   );
