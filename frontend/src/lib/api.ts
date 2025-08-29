@@ -55,6 +55,18 @@ export const api = {
     http<{ message: string }>(`/api/customer/notifications/${notificationId}/read`, {
       method: 'PUT'
     }),
+  
+  // Recommendations API
+  getRecommendations: (companyId: string, asset: string, currentRented: number) =>
+    http<any>('/api/recommendations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        company_id: companyId, 
+        asset: asset, 
+        current_rented: currentRented 
+      })
+    }),
 };
 
 

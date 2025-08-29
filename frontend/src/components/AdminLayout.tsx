@@ -58,7 +58,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  if (user?.userType === 'customer') {
+  // Hide admin navigation when not logged in as admin or on auth pages
+  if (!user || user?.userType === 'customer') {
     return <>{children}</>;
   }
 
