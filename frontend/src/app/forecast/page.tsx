@@ -3,8 +3,10 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import Loader from '@/components/Loader';
 import ErrorState from '@/components/ErrorState';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { TrendingUp, Calendar, MapPin, Package } from 'lucide-react';
+import { TrendingUp, Calendar, MapPin, Package, BarChart3 } from 'lucide-react';
 
 export default function ForecastPage() {
   const { 
@@ -17,19 +19,11 @@ export default function ForecastPage() {
   });
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-black">
-        <Loader />
-      </div>
-    );
+    return <Loader />;
   }
 
   if (error) {
-    return (
-      <div className="min-h-screen bg-black">
-        <ErrorState error="Failed to load forecast data" />
-      </div>
-    );
+    return <ErrorState error={error} />;
   }
 
   // Simple forecast data processing
@@ -53,161 +47,176 @@ export default function ForecastPage() {
   const growthRate = totalCurrent > 0 ? ((totalPredicted - totalCurrent) / totalCurrent * 100) : 0;
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className="mx-auto max-w-6xl py-8 space-y-6">
       {/* Header */}
-      <div className="bg-gray-900 border-b border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center">
-            <h1 className="text-3xl font-bold text-white mb-2">
-              Demand Forecasting
-            </h1>
-            <p className="text-gray-400 max-w-2xl mx-auto">
-              Predict equipment demand to help pre-position tools and machines at the right sites and times
-            </p>
-          </div>
+      <div className="text-center space-y-2">
+        <div className="inline-flex items-center gap-2 text-primary">
+          <BarChart3 className="h-5 w-5" />
+          <span className="uppercase tracking-wider text-xs">Forecasting</span>
         </div>
+        <h1 className="text-3xl font-bold">Demand Forecasting</h1>
+        <p className="text-muted-foreground">
+          Help companies pre-position equipment by predicting which tools/machines will be needed at certain sites/times
+        </p>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-gray-900 rounded-lg border border-gray-700 p-6">
-            <div className="flex items-center">
-              <Package className="h-8 w-8 text-gray-400 mr-3" />
-              <div>
-                <div className="text-2xl font-bold text-white">{totalCurrent}</div>
-                <div className="text-sm text-gray-400">Current Demand</div>
-              </div>
-            </div>
-          </div>
+      {/* Key Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Current Demand</CardTitle>
+            <Package className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalCurrent}</div>
+            <p className="text-xs text-muted-foreground">units across all sites</p>
+          </CardContent>
+        </Card>
 
-          <div className="bg-gray-900 rounded-lg border border-gray-700 p-6">
-            <div className="flex items-center">
-              <TrendingUp className="h-8 w-8 text-gray-400 mr-3" />
-              <div>
-                <div className="text-2xl font-bold text-white">{totalPredicted}</div>
-                <div className="text-sm text-gray-400">Predicted Demand</div>
-              </div>
-            </div>
-          </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Predicted Demand</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalPredicted}</div>
+            <p className="text-xs text-muted-foreground">expected next period</p>
+          </CardContent>
+        </Card>
 
-          <div className="bg-gray-900 rounded-lg border border-gray-700 p-6">
-            <div className="flex items-center">
-              <Calendar className="h-8 w-8 text-gray-400 mr-3" />
-              <div>
-                <div className="text-2xl font-bold text-white">
-                  {growthRate > 0 ? '+' : ''}{growthRate.toFixed(1)}%
-                </div>
-                <div className="text-sm text-gray-400">Growth Rate</div>
-              </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Growth Rate</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {growthRate > 0 ? '+' : ''}{growthRate.toFixed(1)}%
             </div>
-          </div>
+            <p className="text-xs text-muted-foreground">period over period</p>
+          </CardContent>
+        </Card>
 
-          <div className="bg-gray-900 rounded-lg border border-gray-700 p-6">
-            <div className="flex items-center">
-              <MapPin className="h-8 w-8 text-gray-400 mr-3" />
-              <div>
-                <div className="text-2xl font-bold text-white">{equipmentDemand.length}</div>
-                <div className="text-sm text-gray-400">Active Sites</div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Sites</CardTitle>
+            <MapPin className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{equipmentDemand.length}</div>
+            <p className="text-xs text-muted-foreground">monitored locations</p>
+          </CardContent>
+        </Card>
+      </div>
 
-        {/* Historical Trend */}
-        <div className="bg-gray-900 rounded-lg border border-gray-700 p-6 mb-8">
-          <h3 className="text-lg font-semibold text-white mb-4">Historical Rental Trends</h3>
+      {/* Historical Trend */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Historical Rental Trends</CardTitle>
+          <CardDescription>Monthly rental patterns over time</CardDescription>
+        </CardHeader>
+        <CardContent>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis 
                   dataKey="month" 
-                  stroke="#9ca3af"
+                  stroke="#6b7280"
                   fontSize={12}
                 />
                 <YAxis 
-                  stroke="#9ca3af"
+                  stroke="#6b7280"
                   fontSize={12}
                 />
                 <Tooltip 
                   contentStyle={{
-                    backgroundColor: '#1f2937',
-                    border: '1px solid #374151',
-                    borderRadius: '6px',
-                    color: '#fff'
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
                   }}
                 />
                 <Line 
                   type="monotone" 
                   dataKey="rentals" 
-                  stroke="#6b7280" 
+                  stroke="#3b82f6" 
                   strokeWidth={2}
-                  dot={{ fill: '#6b7280', r: 4 }}
+                  dot={{ fill: '#3b82f6', r: 4 }}
                 />
               </LineChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </CardContent>
+      </Card>
 
-        {/* Equipment Demand Forecast */}
-        <div className="bg-gray-900 rounded-lg border border-gray-700 p-6 mb-8">
-          <h3 className="text-lg font-semibold text-white mb-4">Equipment Demand Prediction</h3>
+      {/* Equipment Demand Forecast */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Equipment Demand Prediction</CardTitle>
+          <CardDescription>Current vs predicted demand by equipment type</CardDescription>
+        </CardHeader>
+        <CardContent>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={equipmentDemand}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis 
                   dataKey="equipment" 
-                  stroke="#9ca3af"
+                  stroke="#6b7280"
                   fontSize={12}
                 />
                 <YAxis 
-                  stroke="#9ca3af"
+                  stroke="#6b7280"
                   fontSize={12}
                 />
                 <Tooltip 
                   contentStyle={{
-                    backgroundColor: '#1f2937',
-                    border: '1px solid #374151',
-                    borderRadius: '6px',
-                    color: '#fff'
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
                   }}
                   content={({ active, payload, label }) => {
                     if (active && payload && payload.length) {
                       const data = equipmentDemand.find(item => item.equipment === label);
                       return (
-                        <div className="bg-gray-800 p-3 border border-gray-600 rounded">
-                          <p className="font-medium text-white mb-2">{label}</p>
-                          <p className="text-sm text-gray-300">Site: {data?.site}</p>
-                          <p className="text-sm text-gray-300">Current: {data?.current} units</p>
-                          <p className="text-sm text-gray-300">Predicted: {data?.predicted} units</p>
+                        <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
+                          <p className="font-medium mb-2 text-gray-900">{label}</p>
+                          <p className="text-sm text-gray-600">Site: {data?.site}</p>
+                          <p className="text-sm text-gray-900">Current: {data?.current} units</p>
+                          <p className="text-sm text-gray-900">Predicted: {data?.predicted} units</p>
                         </div>
                       );
                     }
                     return null;
                   }}
                 />
-                <Bar dataKey="current" fill="#4b5563" name="Current Demand" />
-                <Bar dataKey="predicted" fill="#6b7280" name="Predicted Demand" />
+                <Bar dataKey="current" fill="#94a3b8" name="Current Demand" />
+                <Bar dataKey="predicted" fill="#3b82f6" name="Predicted Demand" />
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </CardContent>
+      </Card>
 
-        {/* Detailed Forecast Table */}
-        <div className="bg-gray-900 rounded-lg border border-gray-700 p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Site-wise Equipment Forecast</h3>
+      {/* Detailed Forecast Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Site-wise Equipment Forecast</CardTitle>
+          <CardDescription>Detailed predictions and recommendations</CardDescription>
+        </CardHeader>
+        <CardContent>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-700">
-                  <th className="text-left p-3 text-gray-300">Equipment Type</th>
-                  <th className="text-left p-3 text-gray-300">Site Location</th>
-                  <th className="text-left p-3 text-gray-300">Current Demand</th>
-                  <th className="text-left p-3 text-gray-300">Predicted Demand</th>
-                  <th className="text-left p-3 text-gray-300">Change</th>
-                  <th className="text-left p-3 text-gray-300">Recommendation</th>
+                <tr className="border-b">
+                  <th className="text-left p-3 font-medium">Equipment Type</th>
+                  <th className="text-left p-3 font-medium">Site Location</th>
+                  <th className="text-left p-3 font-medium">Current</th>
+                  <th className="text-left p-3 font-medium">Predicted</th>
+                  <th className="text-left p-3 font-medium">Change</th>
+                  <th className="text-left p-3 font-medium">Recommendation</th>
                 </tr>
               </thead>
               <tbody>
@@ -216,29 +225,29 @@ export default function ForecastPage() {
                   const changePercent = item.current > 0 ? (change / item.current * 100) : 0;
                   
                   return (
-                    <tr key={index} className="border-b border-gray-800 hover:bg-gray-800/50">
-                      <td className="p-3 text-white font-medium">{item.equipment}</td>
-                      <td className="p-3 text-gray-300">{item.site}</td>
-                      <td className="p-3 text-gray-300">{item.current} units</td>
-                      <td className="p-3 text-gray-300">{item.predicted} units</td>
+                    <tr key={index} className="border-b hover:bg-muted/50">
+                      <td className="p-3 font-medium">{item.equipment}</td>
+                      <td className="p-3 text-muted-foreground">{item.site}</td>
+                      <td className="p-3">{item.current} units</td>
+                      <td className="p-3">{item.predicted} units</td>
                       <td className="p-3">
                         <span className={`font-medium ${
-                          change > 0 ? 'text-white' : 
-                          change < 0 ? 'text-gray-400' : 'text-gray-300'
+                          change > 0 ? 'text-green-600' : 
+                          change < 0 ? 'text-red-600' : 'text-muted-foreground'
                         }`}>
                           {change > 0 ? '+' : ''}{change} ({changePercent.toFixed(1)}%)
                         </span>
                       </td>
                       <td className="p-3">
-                        <span className={`px-2 py-1 rounded text-xs ${
-                          change > 5 ? 'bg-gray-700 text-white' :
-                          change < -5 ? 'bg-gray-800 text-gray-400' :
-                          'bg-gray-800 text-gray-300'
-                        }`}>
+                        <Badge variant={
+                          change > 5 ? 'default' :
+                          change < -5 ? 'destructive' :
+                          'secondary'
+                        }>
                           {change > 5 ? 'Increase Stock' : 
                            change < -5 ? 'Reduce Stock' : 
                            'Maintain Current'}
-                        </span>
+                        </Badge>
                       </td>
                     </tr>
                   );
@@ -246,31 +255,36 @@ export default function ForecastPage() {
               </tbody>
             </table>
           </div>
-        </div>
+        </CardContent>
+      </Card>
 
-        {/* Forecast Summary */}
-        <div className="mt-8 bg-gray-900 rounded-lg border border-gray-700 p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Forecast Summary</h3>
-          <div className="space-y-3 text-gray-300">
+      {/* Forecast Summary */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Forecast Summary</CardTitle>
+          <CardDescription>Key insights and recommendations</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
             <div className="flex items-center">
-              <div className="w-2 h-2 bg-gray-400 rounded-full mr-3"></div>
-              <span>Overall equipment demand is expected to increase by {growthRate.toFixed(1)}%</span>
+              <div className="w-2 h-2 bg-primary rounded-full mr-3"></div>
+              <span className="text-sm">Overall equipment demand is expected to increase by {growthRate.toFixed(1)}%</span>
             </div>
             <div className="flex items-center">
-              <div className="w-2 h-2 bg-gray-400 rounded-full mr-3"></div>
-              <span>Excavators and Generators show highest growth potential</span>
+              <div className="w-2 h-2 bg-primary rounded-full mr-3"></div>
+              <span className="text-sm">Excavators and Generators show highest growth potential</span>
             </div>
             <div className="flex items-center">
-              <div className="w-2 h-2 bg-gray-400 rounded-full mr-3"></div>
-              <span>Consider pre-positioning equipment at Mumbai and Pune sites</span>
+              <div className="w-2 h-2 bg-primary rounded-full mr-3"></div>
+              <span className="text-sm">Consider pre-positioning equipment at Mumbai and Pune sites</span>
             </div>
             <div className="flex items-center">
-              <div className="w-2 h-2 bg-gray-400 rounded-full mr-3"></div>
-              <span>Monitor Chennai site for potential demand reduction</span>
+              <div className="w-2 h-2 bg-primary rounded-full mr-3"></div>
+              <span className="text-sm">Monitor Chennai site for potential demand reduction</span>
             </div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

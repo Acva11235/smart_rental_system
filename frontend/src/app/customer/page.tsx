@@ -3,6 +3,10 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { useCustomerRealTime } from '@/hooks/useRealTimeData';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import Loader from '@/components/Loader';
+import ErrorState from '@/components/ErrorState';
 import { 
   Building2, 
   TrendingUp, 
@@ -14,7 +18,9 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
-  DollarSign
+  DollarSign,
+  User,
+  BarChart3
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
@@ -31,25 +37,11 @@ export default function CustomerDashboard() {
   });
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading dashboard...</p>
-        </div>
-      </div>
-    );
+    return <Loader />;
   }
 
   if (error || !dashboardData) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-center">
-          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <p className="text-red-400">Failed to load dashboard data</p>
-        </div>
-      </div>
-    );
+    return <ErrorState error={error || new Error("Failed to load dashboard data")} />;
   }
 
   // Prepare chart data
@@ -71,90 +63,75 @@ export default function CustomerDashboard() {
   }));
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className="mx-auto max-w-6xl py-8 space-y-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-gray-900 to-black border-b border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-white">Welcome back, {user?.username}!</h1>
-              <p className="text-gray-400 mt-2">
-                {dashboardData.companyInfo.name} • {dashboardData.companyInfo.industry}
-              </p>
-            </div>
-            <div className="text-right">
-              <div className="text-sm text-gray-400">Company</div>
-              <div className="text-xl font-semibold text-white">{dashboardData.companyInfo.name}</div>
-            </div>
-          </div>
+      <div className="text-center space-y-2">
+        <div className="inline-flex items-center gap-2 text-primary">
+          <User className="h-5 w-5" />
+          <span className="uppercase tracking-wider text-xs">Customer Portal</span>
         </div>
+        <h1 className="text-3xl font-bold">Welcome back, {user?.username}!</h1>
+        <p className="text-muted-foreground">
+          {dashboardData.companyInfo.name} • {dashboardData.companyInfo.industry}
+        </p>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-gray-900 rounded-xl shadow-lg border border-gray-700 p-6">
-            <div className="flex items-center">
-              <div className="p-3 bg-blue-900/50 rounded-lg">
-                <Truck className="h-8 w-8 text-blue-400" />
-              </div>
-              <div className="ml-4">
-                <div className="text-2xl font-bold text-white">
-                  {dashboardData.activeMachineCount}
-                </div>
-                <div className="text-sm text-gray-400">Active Machines</div>
-              </div>
-            </div>
-          </div>
+      {/* Key Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Machines</CardTitle>
+            <Truck className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{dashboardData.activeMachineCount}</div>
+            <p className="text-xs text-muted-foreground">equipment on rent</p>
+          </CardContent>
+        </Card>
 
-          <div className="bg-gray-900 rounded-xl shadow-lg border border-gray-700 p-6">
-            <div className="flex items-center">
-              <div className="p-3 bg-green-900/50 rounded-lg">
-                <CheckCircle className="h-8 w-8 text-green-400" />
-              </div>
-              <div className="ml-4">
-                <div className="text-2xl font-bold text-white">
-                  {dashboardData.contractSummary.active}
-                </div>
-                <div className="text-sm text-gray-400">Active Contracts</div>
-              </div>
-            </div>
-          </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Contracts</CardTitle>
+            <CheckCircle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{dashboardData.contractSummary.active}</div>
+            <p className="text-xs text-muted-foreground">ongoing agreements</p>
+          </CardContent>
+        </Card>
 
-          <div className="bg-gray-900 rounded-xl shadow-lg border border-gray-700 p-6">
-            <div className="flex items-center">
-              <div className="p-3 bg-purple-900/50 rounded-lg">
-                <DollarSign className="h-8 w-8 text-purple-400" />
-              </div>
-              <div className="ml-4">
-                <div className="text-2xl font-bold text-white">
-                  ₹{dashboardData.financials.totalBilledAmount.toLocaleString()}
-                </div>
-                <div className="text-sm text-gray-400">Total Billed</div>
-              </div>
-            </div>
-          </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Billed</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">₹{dashboardData.financials.totalBilledAmount.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">lifetime spending</p>
+          </CardContent>
+        </Card>
 
-          <div className="bg-gray-900 rounded-xl shadow-lg border border-gray-700 p-6">
-            <div className="flex items-center">
-              <div className="p-3 bg-orange-900/50 rounded-lg">
-                <Clock className="h-8 w-8 text-orange-400" />
-              </div>
-              <div className="ml-4">
-                <div className="text-2xl font-bold text-white">
-                  {dashboardData.financials.pendingInvoices}
-                </div>
-                <div className="text-sm text-gray-400">Pending Payments</div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pending Payments</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{dashboardData.financials.pendingInvoices}</div>
+            <p className="text-xs text-muted-foreground">invoices due</p>
+          </CardContent>
+        </Card>
+      </div>
 
-        {/* Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {/* Contract Status Chart */}
-          <div className="bg-gray-900 rounded-xl shadow-lg border border-gray-700 p-6">
-            <h3 className="text-xl font-semibold text-white mb-4">Contract Status</h3>
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Contract Status Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Contract Status</CardTitle>
+            <CardDescription>Distribution of your contract statuses</CardDescription>
+          </CardHeader>
+          <CardContent>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -173,102 +150,118 @@ export default function CustomerDashboard() {
                   </Pie>
                   <Tooltip 
                     contentStyle={{
-                      backgroundColor: '#1f2937',
-                      border: '1px solid #374151',
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #e5e7eb',
                       borderRadius: '8px',
-                      color: '#fff'
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
                     }}
                   />
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            <div className="flex justify-center space-x-4 mt-4">
+            <div className="flex justify-center flex-wrap gap-4 mt-4">
               {contractData.map((entry, index) => (
                 <div key={entry.name} className="flex items-center">
                   <div 
                     className="w-3 h-3 rounded-full mr-2"
                     style={{ backgroundColor: pieColors[index % pieColors.length] }}
                   ></div>
-                  <span className="text-sm text-gray-300">{entry.name}: {entry.value}</span>
+                  <span className="text-sm text-muted-foreground">{entry.name}: {entry.value}</span>
                 </div>
               ))}
             </div>
-          </div>
+          </CardContent>
+        </Card>
 
-          {/* Machine Types Chart */}
-          <div className="bg-gray-900 rounded-xl shadow-lg border border-gray-700 p-6">
-            <h3 className="text-xl font-semibold text-white mb-4">Active Equipment Types</h3>
+        {/* Machine Types Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Active Equipment Types</CardTitle>
+            <CardDescription>Breakdown of equipment currently on rent</CardDescription>
+          </CardHeader>
+          <CardContent>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={machineChartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                   <XAxis 
                     dataKey="type" 
-                    stroke="#9ca3af"
+                    stroke="#6b7280"
                     fontSize={12}
                     angle={-45}
                     textAnchor="end"
                     height={60}
                   />
-                  <YAxis stroke="#9ca3af" fontSize={12} />
+                  <YAxis stroke="#6b7280" fontSize={12} />
                   <Tooltip 
                     contentStyle={{
-                      backgroundColor: '#1f2937',
-                      border: '1px solid #374151',
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #e5e7eb',
                       borderRadius: '8px',
-                      color: '#fff'
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
                     }}
                   />
                   <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
+      </div>
 
-        {/* Company Information */}
-        <div className="bg-gray-900 rounded-xl shadow-lg border border-gray-700 p-6 mb-8">
-          <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
-            <Building2 className="h-6 w-6 mr-2 text-blue-400" />
+      {/* Company Information */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Building2 className="h-5 w-5" />
             Company Information
-          </h3>
+          </CardTitle>
+          <CardDescription>Your company details and profile</CardDescription>
+        </CardHeader>
+        <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div>
-              <div className="text-sm text-gray-400">Industry</div>
-              <div className="text-white font-medium">{dashboardData.companyInfo.industry}</div>
+              <div className="text-sm text-muted-foreground mb-1">Industry</div>
+              <div className="font-medium">{dashboardData.companyInfo.industry}</div>
             </div>
             <div>
-              <div className="text-sm text-gray-400">State</div>
-              <div className="text-white font-medium">{dashboardData.companyInfo.state}</div>
+              <div className="text-sm text-muted-foreground mb-1">State</div>
+              <div className="font-medium">{dashboardData.companyInfo.state}</div>
             </div>
             <div>
-              <div className="text-sm text-gray-400">Segment</div>
-              <div className="text-white font-medium">{dashboardData.companyInfo.segment}</div>
+              <div className="text-sm text-muted-foreground mb-1">Segment</div>
+              <div className="font-medium">{dashboardData.companyInfo.segment}</div>
             </div>
             <div>
-              <div className="text-sm text-gray-400">Address</div>
-              <div className="text-white font-medium">{dashboardData.companyInfo.address}</div>
+              <div className="text-sm text-muted-foreground mb-1">Address</div>
+              <div className="font-medium">{dashboardData.companyInfo.address}</div>
             </div>
           </div>
-        </div>
+        </CardContent>
+      </Card>
 
-        {/* Active Equipment */}
-        <div className="bg-gray-900 rounded-xl shadow-lg border border-gray-700 p-6">
-          <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
-            <Settings className="h-6 w-6 mr-2 text-green-400" />
+      {/* Active Equipment */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="h-5 w-5" />
             Active Equipment
-          </h3>
-          
+          </CardTitle>
+          <CardDescription>
+            {dashboardData.activeMachines.length} equipment currently on rent
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
           {dashboardData.activeMachines.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-700">
-                    <th className="text-left p-3 text-gray-300">Machine ID</th>
-                    <th className="text-left p-3 text-gray-300">Type</th>
-                    <th className="text-left p-3 text-gray-300">Manufacturer</th>
-                    <th className="text-left p-3 text-gray-300">Contract End Date</th>
-                    <th className="text-left p-3 text-gray-300">Status</th>
+                  <tr className="border-b">
+                    <th className="text-left p-3 font-medium">Machine ID</th>
+                    <th className="text-left p-3 font-medium">Type</th>
+                    <th className="text-left p-3 font-medium">Manufacturer</th>
+                    <th className="text-left p-3 font-medium">Contract End Date</th>
+                    <th className="text-left p-3 font-medium">Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -278,22 +271,22 @@ export default function CustomerDashboard() {
                     const isExpiringSoon = daysLeft <= 7;
                     
                     return (
-                      <tr key={machine.machine_id} className="border-b border-gray-800 hover:bg-gray-800/50">
-                        <td className="p-3 text-white font-medium">#{machine.machine_id}</td>
-                        <td className="p-3 text-gray-300">{machine.asset_type}</td>
-                        <td className="p-3 text-gray-300">{machine.manufacturer}</td>
-                        <td className="p-3 text-gray-300">
+                      <tr key={machine.machine_id} className="border-b hover:bg-muted/50">
+                        <td className="p-3 font-medium">#{machine.machine_id}</td>
+                        <td className="p-3 text-muted-foreground">{machine.asset_type}</td>
+                        <td className="p-3 text-muted-foreground">{machine.manufacturer}</td>
+                        <td className="p-3 text-muted-foreground">
                           {endDate.toLocaleDateString()}
                         </td>
                         <td className="p-3">
                           {isExpiringSoon ? (
-                            <span className="px-2 py-1 bg-red-900/30 text-red-300 rounded-full text-xs">
+                            <Badge variant="destructive">
                               Expires in {daysLeft} days
-                            </span>
+                            </Badge>
                           ) : (
-                            <span className="px-2 py-1 bg-green-900/30 text-green-300 rounded-full text-xs">
+                            <Badge variant="default">
                               Active
-                            </span>
+                            </Badge>
                           )}
                         </td>
                       </tr>
@@ -304,12 +297,12 @@ export default function CustomerDashboard() {
             </div>
           ) : (
             <div className="text-center py-12">
-              <Truck className="h-12 w-12 text-gray-500 mx-auto mb-4" />
-              <p className="text-gray-400">No active equipment rentals</p>
+              <Truck className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">No active equipment rentals</p>
             </div>
           )}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
