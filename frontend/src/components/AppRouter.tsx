@@ -14,7 +14,7 @@ export default function AppRouter({ children }: { children: React.ReactNode }) {
       // If user is authenticated and on auth page, redirect to appropriate dashboard
       if (user && pathname === '/auth') {
         if (user.userType === 'admin') {
-          router.replace('/');
+          router.replace('/admin');
         } else {
           router.replace('/customer');
         }
@@ -34,8 +34,8 @@ export default function AppRouter({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // If user is not authenticated and not on auth page, show auth page
-  if (!user && pathname !== '/auth') {
+  // If user is not authenticated and not on auth page or root, show auth page
+  if (!user && pathname !== '/auth' && pathname !== '/') {
     return <AuthPage />;
   }
 

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -34,19 +34,43 @@ const formatStatus = (status: string) => {
 export function EnhancedDataTable({ assets, onViewDetail }: EnhancedDataTableProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [manufacturerFilter, setManufacturerFilter] = useState('all');
+  const [minRate, setMinRate] = useState<string>('');
+  const [maxRate, setMaxRate] = useState<string>('');
+  const [pageSize, setPageSize] = useState<number>(25);
+  const [currentPage, setCurrentPage] = useState<number>(1);
 
-  const filteredAssets = assets.filter(asset => {
-    const matchesSearch = 
-      asset.asset_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      asset.manufacturer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      asset.machine_id.toString().includes(searchTerm);
-    
-    const matchesStatus = statusFilter === 'all' || asset.status === statusFilter;
-    
-    return matchesSearch && matchesStatus;
-  });
+  const filteredAssets = useMemo(() => {
+    const min = minRate.trim() === '' ? -Infinity : Number(minRate);
+    const max = maxRate.trim() === '' ? Infinity : Number(maxRate);
+    return assets.filter(asset => {
+      const matchesSearch =
+        asset.asset_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        asset.manufacturer.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        asset.machine_id.toString().includes(searchTerm);
 
-  const uniqueStatuses = Array.from(new Set(assets.map(a => a.status)));
+      const matchesStatus = statusFilter === 'all' || asset.status === statusFilter;
+      const matchesType = typeFilter === 'all' || asset.asset_type === typeFilter;
+      const matchesMaker = manufacturerFilter === 'all' || asset.manufacturer === manufacturerFilter;
+
+      const dayRate = Number(asset.rental_price_per_day || 0);
+      const matchesRate = dayRate >= min && dayRate <= max;
+
+      return matchesSearch && matchesStatus && matchesType && matchesMaker && matchesRate;
+    });
+  }, [assets, searchTerm, statusFilter, typeFilter, manufacturerFilter, minRate, maxRate]);
+
+  const uniqueStatuses = useMemo(() => Array.from(new Set(assets.map(a => a.status))), [assets]);
+  const uniqueTypes = useMemo(() => Array.from(new Set(assets.map(a => a.asset_type))), [assets]);
+  const uniqueManufacturers = useMemo(() => Array.from(new Set(assets.map(a => a.manufacturer))), [assets]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredAssets.length / pageSize));
+  const pageStart = (currentPage - 1) * pageSize;
+  const visibleAssets = useMemo(() => filteredAssets.slice(pageStart, pageStart + pageSize), [filteredAssets, pageStart, pageSize]);
+
+  // Reset to first page on filters change
+  React.useEffect(() => { setCurrentPage(1); }, [searchTerm, statusFilter, typeFilter, manufacturerFilter, minRate, maxRate, pageSize]);
 
   return (
     <Card className="w-full">
@@ -66,14 +90,14 @@ export function EnhancedDataTable({ assets, onViewDetail }: EnhancedDataTablePro
           </div>
         </div>
         
-        <div className="flex gap-4 mt-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mt-4">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
               placeholder="Search assets..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-10 bg-gray-100 border-gray-300 text-gray-900 focus:bg-gray-50"
             />
           </div>
           
@@ -82,7 +106,7 @@ export function EnhancedDataTable({ assets, onViewDetail }: EnhancedDataTablePro
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-200 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-100 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-gray-50"
             >
               <option value="all">All Status</option>
               {uniqueStatuses.map(status => (
@@ -92,13 +116,48 @@ export function EnhancedDataTable({ assets, onViewDetail }: EnhancedDataTablePro
               ))}
             </select>
           </div>
+
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-gray-500" />
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-100 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-gray-50"
+            >
+              <option value="all">All Types</option>
+              {uniqueTypes.map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-gray-500" />
+            <select
+              value={manufacturerFilter}
+              onChange={(e) => setManufacturerFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-100 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-gray-50"
+            >
+              <option value="all">All Manufacturers</option>
+              {uniqueManufacturers.map(m => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Input placeholder="Min rate" value={minRate} onChange={(e) => setMinRate(e.target.value)} className="bg-gray-100 border-gray-300 text-gray-900 focus:bg-gray-50" />
+            <span className="text-gray-400">-</span>
+            <Input placeholder="Max rate" value={maxRate} onChange={(e) => setMaxRate(e.target.value)} className="bg-gray-100 border-gray-300 text-gray-900 focus:bg-gray-50" />
+          </div>
         </div>
       </CardHeader>
       
       <CardContent>
         <div className="rounded-md border">
+          <div className="max-h-[480px] overflow-y-auto">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 bg-white z-10">
               <TableRow className="bg-gray-50/50">
                 <TableHead className="font-semibold">Asset ID</TableHead>
                 <TableHead className="font-semibold">Type</TableHead>
@@ -112,7 +171,7 @@ export function EnhancedDataTable({ assets, onViewDetail }: EnhancedDataTablePro
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredAssets.map((asset, index) => (
+              {visibleAssets.map((asset, index) => (
                 <TableRow key={`${asset.machine_id}-${index}`} className="hover:bg-gray-50/50">
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
@@ -161,17 +220,31 @@ export function EnhancedDataTable({ assets, onViewDetail }: EnhancedDataTablePro
               ))}
             </TableBody>
           </Table>
+          </div>
         </div>
         
-        <div className="flex items-center justify-between pt-4 text-sm text-gray-500">
-          <span>
-            Showing {filteredAssets.length} of {assets.length} assets
-          </span>
-          <span>
-            {assets.filter(a => a.status === 'available').length} available • {' '}
-            {assets.filter(a => a.status === 'rented').length} rented • {' '}
-            {assets.filter(a => a.status === 'under_maintenance').length} in maintenance
-          </span>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 pt-4 text-sm text-gray-500">
+          <div>
+            Showing {visibleAssets.length} of {filteredAssets.length} filtered • Total {assets.length}
+          </div>
+          <div className="flex items-center gap-3">
+            <label className="text-xs text-gray-500">Rows:</label>
+            <select
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value))}
+              className="px-2 py-1 border border-gray-300 rounded-md text-sm bg-gray-100 text-gray-900"
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Prev</Button>
+              <span>Page {currentPage} of {totalPages}</span>
+              <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Next</Button>
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>

@@ -5,7 +5,7 @@ const bcrypt = require('bcrypt');
 // Anomaly detection integrations
 const { detectAnomaly } = require('./anamolyservice');
 const anomalyRoutes = require('./routes/anamoly');
-
+const axios = require('axios');
 const app = express();
 const PORT = 5001;
 
@@ -16,7 +16,33 @@ app.use(cors({
 }));
 
 app.use(express.json());
+app.post('/api/recommendations', async (req, res) => {
+  try {
+      const { company_id, asset, current_rented } = req.body;
+      if (!company_id || !asset || current_rented === undefined) {
+          return res.status(400).json({ message: "Missing required fields: company_id, asset, current_rented" });
+      }
 
+      // The URL for your running Flask API
+      const flaskApiUrl = 'http://localhost:8001/recommend';
+
+      const flaskResponse = await axios.post(flaskApiUrl, {
+          company_id,
+          asset,
+          current_rented
+      });
+
+      res.json(flaskResponse.data);
+  } catch (error) {
+      // Forward the error from the Flask API if possible
+      if (error.response) {
+          console.error('Error from Flask API:', error.response.data);
+          return res.status(error.response.status).json(error.response.data);
+      }
+      console.error('Recommendation proxy error:', error.message);
+      res.status(500).json({ message: 'Error getting recommendation from service' });
+  }
+});
 // Mount anomaly routes
 app.use('/anomaly', anomalyRoutes);
 

@@ -20,7 +20,7 @@ export default function CustomerLayout({
 
   useEffect(() => {
     if (!user || user.userType !== 'customer') {
-      router.push('/auth');
+      router.push('/');
       return;
     }
     
@@ -45,7 +45,7 @@ export default function CustomerLayout({
 
   const handleLogout = () => {
     logout();
-    router.push('/auth');
+    router.push('/');
   };
 
   if (!user || user.userType !== 'customer') {

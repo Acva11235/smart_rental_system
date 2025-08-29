@@ -51,7 +51,7 @@ export default function AuthPage() {
         login(response.user)
 
         if (response.user.userType === "admin") {
-          router.push("/")
+          router.push("/admin")
         } else {
           router.push("/customer")
         }
